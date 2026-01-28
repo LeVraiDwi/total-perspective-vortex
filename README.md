@@ -1,6 +1,25 @@
 # total-perspective-vortex
 total-perspective-vortex 42 Project
 
+# Preprocessing, parsing and formating
+Ici le but est d'explorer les donnees EEG avec [MNE](https://mne.tools/stable/index.html). 
+
+## Preprocessing
+Dans un premier temps on visualize les donnees brut afin de voir a quoi ressemble un **EEG** et de comprendre ce qui vas nous interresser dans les signaux:
+![Raw data graph](images/raw_data.png)
+On observe que:
+Un fichier EDF contient plusieurs canaux, un par électrode.
+Chaque canal correspond au signal mesuré par cette électrode.
+Ce signal est une suite de valeurs d’amplitude enregistrées à différents instants, formant une série temporelle (time series).
+Le graphique representant les donnees brut est dure a analyser il y a beaucoup de cannaux et de bruit.
+On sait que les cannaux situer sur le cortex moteur sont les cannaux C3, Cz et C4:
+- C3 → cortex moteur gauche → main gauche
+- C4 → cortex moteur droite → main droite
+- CZ → midline → pied
+On vas donc filtrer les donnees sur c'est cannaux.
+La prochaine etape est de determiner qu' elle bande de frequence nous interresse -> psd
+
+## MNE
 # Dataset
 ## Expérimentation
 Le dataset est constitué de **1 500 enregistrements** d’EEG de **1 et 2 minutes**, réalisés sur **109 volontaires**.  
@@ -43,7 +62,7 @@ Il y a **trois types d’annotations** :
 
 ## Montage
 Les signaux EEG ont été enregistrés à partir de **64 électrodes** selon le système international **10-10** (à l’exclusion des électrodes Nz, F9, F10, FT9, FT10, A1, A2, TP9, TP10, P9 et P10)  
-([schéma](https://physionet.org/content/eegmmidb/1.0.0/64_channel_sharbrough.pdf)).
+([schéma](https://physionet.org/content/eegmmidb/1.0.0/64_channel_sharbrough.pdf)). 
 
 Le numéro indiqué sous chaque nom d’électrode (1–64) correspond à l’ordre dans lequel elle apparaît dans l’enregistrement (0–63).
 
@@ -54,6 +73,11 @@ Un fichier EDF+ contient :
 - une fréquence d’échantillonnage définie pour chaque canal,
 - un canal d’annotation permettant de stocker des événements synchronisés dans le temps (début/fin de tâches, stimuli, repos, etc.),
 - des métadonnées décrivant l’enregistrement (sujet, durée, capteurs, unités).
+
+# Sources
+[Deep learning methods for motor imagery detection from raw EEG: applications to brain-computer interfaces](https://hal.univ-lorraine.fr/tel-03229010v1/file/DDOC_T_2021_0032_AVILOV.pdf)
+[physionet](https://physionet.org/content/eegmmidb/1.0.0/)
+[Classification of Motor Functions from Electroencephalogram (EEG) Signals Based on an Integrated Method Comprised of Common Spatial Pattern and Wavelet Transform Framework](https://pmc.ncbi.nlm.nih.gov/articles/PMC6891287/)
 
 # Glossaire
 **EEG** : Electroencephalogram
@@ -81,3 +105,6 @@ Goldberger, A., Amaral, L., Glass, L., Hausdorff, J., Ivanov, P.C., Mark, R., Mi
 
 **VANCOUVER**  
 Goldberger A, Amaral L, Glass L, Hausdorff J, Ivanov PC, Mark R, Mietus JE, Moody GB, Peng CK, Stanley HE. PhysioBank, PhysioToolkit, and PhysioNet: Components of a new research resource for complex physiologic signals. *Circulation* [Online]. 2000;101(23):e215–e220. RRID:SCR_007345.
+
+
+https://betterexplained.com/articles/an-interactive-guide-to-the-fourier-transform/
