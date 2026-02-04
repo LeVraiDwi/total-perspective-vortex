@@ -9,30 +9,36 @@ import matplotlib.pyplot as plt
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.model_selection import ShuffleSplit, cross_val_score
 from mne.time_frequency import tfr_array_morlet
+from mne.io import concatenate_raws, read_raw_edf
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 motor_channels = ['C3', 'Cz', 'C4']
+tmin, tmax = -1.0, 4.0
+subjects = 1
+runs = [3, 4, 7, 8, 11, 12]  # motor imagery: hands vs feet
 
 def create_epochs(raw, events, run):
-    task_id = {}
-
-    if run in [3, 4, 7, 8, 11, 12]:
-        task_id = {
-            'left_fist': 1,  # T1 corresponds to left fist
-            'right_fist': 2,  # T2 corresponds to right fist
-        }
-    elif run in [5, 6, 9, 10, 13, 14]:
-        task_id = {
-            'both_fists': 1,  # T1 corresponds to both fists
-            'both_feet': 2,  # T2 corresponds to both feet
-        }
-
+    picks = mne.pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False, exclude="bads")
+    
     tmin, tmax = -1., 4.
-    epochs = mne.Epochs(raw, events, task_id, tmin, tmax, proj=True,
-                        baseline=None, preload=True)
+    epochs = mne.Epochs(
+    raw,
+    events,
+    tmin=tmin,
+    tmax=tmax,
+    proj=True,
+    picks=picks,
+    baseline=None,
+    preload=True,
+    )
+    epochs_train = epochs.copy()#.crop(tmin=1.0, tmax=2.0)
+    labels = epochs.events[:, -1] - 2
+    
+    raw.plot(duration=5, n_channels=3)
 
-    return epochs
+    return epochs, epochs_train, labels
 
 
 def compute_time_frequency_analysis(epochs, subject: int, run: int):
@@ -51,16 +57,22 @@ def compute_time_frequency_analysis(epochs, subject: int, run: int):
         raise RuntimeError(f"Wavelet transform failed for subject {subject}, run {run}: {e}") from e
     return power.mean(axis=-1), y, freqs
 
-def load_raw(subject: int, run: int):
+def load_raw(subject: int, run: list[int]):
     mne.set_log_level("WARNING")
-    files = load_data(subject, run, path="/home/tcosse/total-perspective-vortex/data/physionet.org/files/eegmmidb/1.0.0/")
-    if not files:
+    raw_fnames = load_data(subject, run, path="/home/tcosse/total-perspective-vortex/data/physionet.org/files/eegmmidb/1.0.0/")
+    if not raw_fnames:
         raise RuntimeError(f"No data files found for subject {subject}, run {run}")
-    raws = mne.io.read_raw_edf(files[0], preload=True, verbose="ERROR")
-    eegbci.standardize(raws)
-    raws.set_montage("standard_1005", on_missing="ignore")
-    raws.plot(duration=5, n_channels=32)
-    return raws
+    raw = concatenate_raws([read_raw_edf(f, preload=True) for f in raw_fnames])
+    eegbci.standardize(raw)
+    
+    raw.set_montage("standard_1005", on_missing="ignore")
+    if run == [3, 4, 7, 8, 11, 12]:
+        raw.annotations.rename(dict(T1="left_fist", T2="right_fist"))  # as documented on PhysioNet
+    elif run == [5, 6, 9, 10, 13, 14]:
+        raw.annotations.rename(dict(T1="both_fists", T2="both_feet"))  # as documented on PhysioNet
+    raw.set_eeg_reference(projection=True)
+    raw.plot(duration=5, n_channels=32)
+    return raw
     
 def extract_events(raw):
     events, event_id = mne.events_from_annotations(raw)
@@ -68,34 +80,33 @@ def extract_events(raw):
         raise RuntimeError("No events found in the raw data annotations")
     return events, event_id
 
-def load_and_visualize_raw(subject: int, run: int):
+def load_and_visualize_raw(subject: int, run: list[int]):
     mne.set_log_level("WARNING")
     raw = load_raw(subject, run)
 
     return raw
 
 def apply_filters(raw, l_freq=1., h_freq=40., visualize=True):
-    raw.filter(l_freq=l_freq, h_freq=h_freq)
     motor_ch_available = [ch for ch in motor_channels if ch in raw.ch_names]
+
     if not motor_ch_available:
         print(f"    No motor channels , skipping")
 
     raw = raw.copy().pick_channels(motor_ch_available)
-    raw.filter(7, 32)
+    raw.filter(l_freq, h_freq, fir_design="firwin", skip_by_annotation="edge")
     if visualize:
         raw.plot(block=False, title="Filtered EEG Data (1-40 Hz)", show_scrollbars=False, scalings='auto')
         plt.show()
-    raw.compute_psd(fmin=l_freq, fmax=h_freq, method="multitaper", verbose=False, n_jobs=1)
 
     return raw
 
 
 def create_epochs_from_raw(raw, run: int, subject: int):
     events, event_id = extract_events(raw)
-    epochs = create_epochs(raw, events, run)
+    epochs, epochs_train, labels = create_epochs(raw, events, run)
     if len(epochs) == 0:
         raise RuntimeError(f"All epochs were dropped for subject {subject}, run {run}")
-    return epochs
+    return epochs, epochs_train, labels
 
 def compute_time_frequency_analysis(epochs, subject: int, run: int):
     X_raw = epochs.get_data()
@@ -146,20 +157,58 @@ class WaveletTransformer:
 
         return features.reshape(n_epochs, -1)
 
-def preprocess(subject: int, run: int, l_freq=1., h_freq=40., visualize=True):
+
+def preprocess(subject: int, run: list[int], l_freq=1., h_freq=40., visualize=True):
     try:
         raw = load_and_visualize_raw(subject, run)
         
         raw = apply_filters(raw, l_freq, h_freq, visualize)
 
-        epochs = create_epochs_from_raw(raw, run, subject)
+        epochs, epochs_train, labels = create_epochs_from_raw(raw, run, subject)
         
-        power_mean, y, freqs = compute_time_frequency_analysis(epochs, subject, run)
+       # 2. Epoching
+        epochs, epochs_train, labels = create_epochs_from_raw(raw, run, subject)
+        epochs_data = epochs.get_data(copy=True)
+        sfreq = epochs.info['sfreq']
+        
+        # 3. Define Cross-Validation
+        cv = ShuffleSplit(10, test_size=0.2, random_state=42)
+
+        # Assemble a classifier
+        #csp = mne.decoding.CSP(n_components=4, reg=None, log=True, norm_trace=False)
+        #lda = LinearDiscriminantAnalysis()
+        #csp_pipe = Pipeline([("CSP", csp), ("LDA", lda)])
+        
+        #csp_scores = cross_val_score(csp_pipe, epochs_data, labels, cv=cv)
+
+        # Assuming WaveletTransformer is defined as in your snippet
+        wavelet_freqs = np.arange(8, 31, 2) 
+        wavelet_pipe = Pipeline([
+            ("wavelet", WaveletTransformer(frequencies=wavelet_freqs, sfreq=sfreq)),
+            ("scaler", StandardScaler()),
+            ("clf", SVC(kernel="linear", C=1.0))
+        ])
+
+        # Running cross-validation for Wavelets
+        wavelet_scores = cross_val_score(wavelet_pipe, epochs_data, labels, cv=cv)
+        print(f"Wavelet Mean Accuracy: {wavelet_scores.mean():.2f}")
+
+        ## 4. Reporting
+        print(f"\n--- Results for Subject {subject} ---")
+        #print(f"CSP + LDA Accuracy:     {np.mean(csp_scores):.3f}")
+        print(f"Wavelet + SVC Accuracy: {np.mean(wavelet_scores):.3f}")
+        # plot eigenvalues and patterns estimated on full data for visualization
+        csp.fit(epochs_data, labels)
+        csp.plot_patterns(epochs.info, title="CSP Patterns")
+
+        # Compute for return values
+        power_mean, y, freqs = compute_time_frequency_analysis(epochs, subject, run[0])
+        return power_mean, y, freqs, csp_scores, wavelet_scores
     except Exception as e:
         raise RuntimeError(f"Preprocessing failed for subject {subject}, run {run}: {e}") from e
 
 
-preprocess(1, 1)
+preprocess(1, runs)
 #pipeline = Pipeline([
 #    ("wavelet", WaveletTransformer(
 #        frequencies=frequencies,
