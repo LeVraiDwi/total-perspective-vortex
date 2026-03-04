@@ -9,6 +9,8 @@ from preprocessing.visualize import plot_scalogram, plot_topoMap
 from preprocessing.waweletTransformer import WaveletDenoiseTransformer
 from preprocessing.load_data import load_and_clean_data
 import argparse
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 tmin, tmax = 0.0, 4.0
 subjects = 4
@@ -40,8 +42,29 @@ def Train(subject: int, run: int, visualize: bool = False):
         ('CSP', CSP(n_components=4, reg=None, log=False, norm_trace=False)),
         ('LDA', LinearDiscriminantAnalysis()),
     ])
-    scores = cross_val_score(clf, X_raw, y, cv=cv, n_jobs=None, verbose=0)
     
+    scores = cross_val_score(clf, X_raw, y, cv=cv, n_jobs=None, verbose=0)
+    X_train_val, X_test, y_train_val, y_test = train_test_split(
+        X_raw, y, test_size=0.20, random_state=None, stratify=y
+    )
+    
+    # On divise le reste (80%) pour avoir 20% de VAL et 60% de TRAIN
+    # 0.25 * 0.80 = 0.20
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_train_val, y_train_val, test_size=0.25, random_state=None, stratify=y_train_val
+    )
+    clf.fit(X_train, y_train)
+    
+    # Score sur le Validation Set (pour ajuster tes idées)
+    val_score = clf.score(X_val, y_val)
+    print(f"Validation Accuracy: {val_score:.4f}")
+
+    # --- ÉTAPE 4 : ÉVALUATION FINALE (TEST) ---
+    # On vérifie si le modèle généralise bien sur le Test Set
+    test_preds = clf.predict(X_test)
+    test_score = accuracy_score(y_test, test_preds)
+    print(f"TEST FINAL ACCURACY: {test_score:.4f}")
+
     joblib.dump(clf, f"./model/Export_{subject}_{run}.pkl")
     print(f"Model saved as Export_{subject}_{run}.pkl")
     
