@@ -28,6 +28,7 @@ def Predict(subject: int, run: int, model_path: str):
     # 5. Affichage des résultats
     print("-" * 30)
     print(f"Résultats pour Sujet {subject}, Run {run}:")
+    
     for i, p in enumerate(predictions):
         label_pred = [k for k, v in event_id.items() if v == p][0]
         label_true = [k for k, v in event_id.items() if v == y_true[i]][0]

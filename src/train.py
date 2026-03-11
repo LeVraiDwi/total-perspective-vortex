@@ -1,6 +1,6 @@
 import mne
 import numpy as np
-from mne.decoding import CSP
+from preprocessing.csp import CSP
 from sklearn.pipeline import Pipeline
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import ShuffleSplit, cross_val_score
@@ -39,7 +39,7 @@ def Train(subject: int, run: int, visualize: bool = False):
     # CSP reduces spatial dimensions, LDA makes the final decision
     clf = Pipeline([
         ('wavelet', WaveletDenoiseTransformer(wavelet='db4', level=3)),
-        ('CSP', CSP(n_components=4, reg=None, log=False, norm_trace=False)),
+        ('CSP', CSP(n_components=4)),
         ('LDA', LinearDiscriminantAnalysis()),
     ])
     

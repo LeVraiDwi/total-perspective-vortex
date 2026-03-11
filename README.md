@@ -74,6 +74,35 @@ Un fichier EDF+ contient :
 - un canal d’annotation permettant de stocker des événements synchronisés dans le temps (début/fin de tâches, stimuli, repos, etc.),
 - des métadonnées décrivant l’enregistrement (sujet, durée, capteurs, unités).
 
+# Project Spec
+## Part 1
+- preprocessing ✅
+- parsing ✅
+- formating ✅
+- visualisation ✅
+
+## Part 2
+- Dimensionality reduction algorith ✅
+- Classification algorithm 
+- simulate a data stream 
+
+## Part 3
+- implement the reduction algorithm ✅
+
+## Part 4
+- spliting data 
+- train, predict and test 
+- run on all subject or select a task on train and predict 
+
+## Requirement:
+- use the pipeline object from sklearn 
+- use baseEstimator and transformer-Mixin classes of sklearn
+- use cross_val_score on the whole processing pipeline, to evaluate your classification
+- 60% mean accuracy 
+
+## Authorize
+- Numpy or function to find eigenvalues, singular values, and covariance matrix estimation
+
 # Sources
 [Deep learning methods for motor imagery detection from raw EEG: applications to brain-computer interfaces](https://hal.univ-lorraine.fr/tel-03229010v1/file/DDOC_T_2021_0032_AVILOV.pdf)
 [physionet](https://physionet.org/content/eegmmidb/1.0.0/)
