@@ -2,11 +2,20 @@ import mne
 import joblib
 import numpy as np
 from preprocessing.load_data import load_and_clean_data
+from sklearn.model_selection import train_test_split
+import time
 
-def Predict(subject: int, run: int, model_path: str):
+def Predict(subject: int, run: int, model_path = "./model/", max_delay = 2.0, verbose = True, delay = 0.1):
     # 1. Charger le modèle sauvegardé
-    print(f"Chargement du modèle : {model_path}")
-    clf = joblib.load(model_path)
+    print(f"Chargement du modèle : {model_path}Export_{subject}_{run}.pkl")
+    try:
+        data = joblib.load(model_path)
+        clf = data["clf"]
+        random_state = data["random_state"]
+        test_size = data["test_size"]
+    except FileNotFoundError:
+        print(f"Model file not found: {model_path}")
+        return
     
     # 2. Charger et nettoyer les nouvelles données (Inférence)
     # On utilise la même fonction de nettoyage pour garder la cohérence (8-30Hz)
@@ -18,26 +27,39 @@ def Predict(subject: int, run: int, model_path: str):
                         baseline=None, preload=True)
     
     # Données X: (n_epochs, n_channels, n_times)
-    X_new = epochs.get_data()
+    X_raw = epochs.get_data()
     y_true = epochs.events[:, -1] # Pour vérifier si la prédiction est juste
+    X_train_val, X_validation, y_train_val, y_validation = train_test_split(X_raw, y_true, test_size=test_size, random_state=random_state)
 
-    # 4. Exécuter la prédiction
-    # Le pipeline s'occupe de WaveletDenoiseTransformer + CSP + LDA automatiquement
-    predictions = clf.predict(X_new)
-    
-    # 5. Affichage des résultats
-    print("-" * 30)
-    print(f"Résultats pour Sujet {subject}, Run {run}:")
-    
-    for i, p in enumerate(predictions):
-        label_pred = [k for k, v in event_id.items() if v == p][0]
-        label_true = [k for k, v in event_id.items() if v == y_true[i]][0]
-        match = "✅" if p == y_true[i] else "❌"
-        print(f"Epoch {i}: Prédit = {label_pred} | Réel = {label_true} {match}")
-    
-    accuracy = np.mean(predictions == y_true)
-    print(f"\nPrécision globale sur ce run : {accuracy:.4f}")
+    correct = 0
+    processing_times = []
 
-if __name__ == "__main__":
-    # Exemple : Prédire sur le sujet 4, run 12 avec le modèle entraîné précédemment
-    Predict(subject=7, run=3, model_path="./model/Export_7_11.pkl")
+    for  i, (x_epoch, true_label) in enumerate(zip(X_validation, y_validation)):
+        start_time = time.time()
+        pred = clf.predict(x_epoch.reshape(1, x_epoch.shape[0], x_epoch.shape[1]))
+        processing_time = time.time() - start_time
+        processing_times.append(processing_time)
+        
+        if processing_time > max_delay:
+            print(f"⚠️  WARNING: Processing time {processing_time:.3f}s exceeds {max_delay}s limit!")
+        
+        is_equal = pred == true_label
+        if is_equal:
+            correct += 1
+        
+        if verbose:
+            status = "✅" if is_equal else "❌"
+            print(f"epoch {i:02d}: [{pred}] [{true_label}] {status} ({processing_time:.3f}s)")
+        
+        time.sleep(delay)
+
+        accuracy = correct / len(y_validation)
+        avg_processing_time = sum(processing_times) / len(processing_times)
+        max_processing_time = max(processing_times)
+
+    if verbose:
+        print("=" * 50)
+        print(f"Accuracy: {accuracy:.4f} ({correct}/{len(y_validation)})")
+        print(f"Average processing time: {avg_processing_time:.3f}s")
+        print(f"Maximum processing time: {max_processing_time:.3f}s")
+        print(f"Samples exceeding {max_delay}s limit: {sum(1 for t in processing_times if t > max_delay)}")

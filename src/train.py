@@ -3,21 +3,42 @@ import numpy as np
 from preprocessing.csp import CSP
 from sklearn.pipeline import Pipeline
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.model_selection import ShuffleSplit, cross_val_score
+from sklearn.model_selection import ShuffleSplit , cross_val_score
 import joblib
 from preprocessing.visualize import plot_scalogram, plot_topoMap
 from preprocessing.waweletTransformer import WaveletDenoiseTransformer
 from preprocessing.load_data import load_and_clean_data
-import argparse
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
 tmin, tmax = 0.0, 4.0
 subjects = 4
 runs = 14# motor imagery: hands vs feet
 
+def save_model(model_data, subject, run):
+    model_path = f"./model/Export_{subject}_{run}.pkl"
+    joblib.dump(model_data, model_path)
+    print(f"Model saved as Export_{subject}_{run}.pkl")
+    return
+
+def cross_val(clf, X, y, random_state):
+    cv = ShuffleSplit(10, test_size=0.2, random_state=random_state)
+
+    scores = cross_val_score(clf, X, y, cv=cv, n_jobs=None, verbose=0)
+    scores_str = np.array2string(scores, precision=4, separator=' ')
+    
+    # Combine into your specific format
+    print(f"{scores_str}\ncross_val_score: {np.mean(scores):.4f}")
+    return scores
+
+def score_model(clf, X, y):
+    # Score sur le Validation Set (pour ajuster tes idées)
+    val_score = clf.score(X, y)
+    print(f"Validation Accuracy: {val_score:.4f}")
+    
+    return val_score
+
 # --- 3. Train TREATMENT PIPELINE ---
-def Train(subject: int, run: int, visualize: bool = False):
+def Train(subject: int, run: int, random_state = 42, visualize: bool = False, test_size = 0.3):
     mne.set_log_level('WARNING')
     raw = load_and_clean_data(subject, run, visualize)
     
@@ -34,7 +55,7 @@ def Train(subject: int, run: int, visualize: bool = False):
     if visualize:
         plot_scalogram(X_raw)
     
-    cv = ShuffleSplit(10, test_size=0.2, random_state=42)
+    X_train_val, X_validation, y_train_val, y_validation = train_test_split(X_raw, y, test_size=test_size, random_state=random_state)
     # Setup the Processing Pipeline: CSP + LDA
     # CSP reduces spatial dimensions, LDA makes the final decision
     clf = Pipeline([
@@ -42,58 +63,28 @@ def Train(subject: int, run: int, visualize: bool = False):
         ('CSP', CSP(n_components=4)),
         ('LDA', LinearDiscriminantAnalysis()),
     ])
-    
-    scores = cross_val_score(clf, X_raw, y, cv=cv, n_jobs=None, verbose=0)
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X_raw, y, test_size=0.20, random_state=None, stratify=y
-    )
+
+    clf.fit(X_train_val, y_train_val)
+
+    scores = cross_val(clf, X_train_val, y_train_val, random_state=random_state)
     
     # On divise le reste (80%) pour avoir 20% de VAL et 60% de TRAIN
     # 0.25 * 0.80 = 0.20
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val, y_train_val, test_size=0.25, random_state=None, stratify=y_train_val
-    )
-    clf.fit(X_train, y_train)
+    #X_validation_val, X_test_val, y_validation_val, y_test_val = train_test_split(
+    #    X_validation, y_validation, test_size=0.5, random_state=None, stratify=y_validation
+    #)
     
-    # Score sur le Validation Set (pour ajuster tes idées)
-    val_score = clf.score(X_val, y_val)
-    print(f"Validation Accuracy: {val_score:.4f}")
+    # Score sur le Validation Set
+    #val_score = score_model(clf, X_validation_val, y_validation_val)
 
-    # --- ÉTAPE 4 : ÉVALUATION FINALE (TEST) ---
-    # On vérifie si le modèle généralise bien sur le Test Set
-    test_preds = clf.predict(X_test)
-    test_score = accuracy_score(y_test, test_preds)
-    print(f"TEST FINAL ACCURACY: {test_score:.4f}")
-
-    joblib.dump(clf, f"./model/Export_{subject}_{run}.pkl")
-    print(f"Model saved as Export_{subject}_{run}.pkl")
+    model_data = {
+        "clf": clf,
+        "cv_scores": scores,
+        "random_state": random_state,
+        "test_size": test_size
+    }
     
-    # --- CUSTOM CONSOLE OUTPUT ---
-    # Format scores array to a clean string
-    # precision=4 limits the decimals, separator=' ' removes commas
-    scores_str = np.array2string(scores, precision=4, separator=' ')
-    
-    # Combine into your specific format
-    print(f"{scores_str}\ncross_val_score: {np.mean(scores):.4f}")
-    #class_balance = np.mean(y == y[0])
-    #class_balance = max(class_balance, 1.0 - class_balance)
-    #print(f"Classification accuracy: {np.mean(scores)} / Chance level: {class_balance}")
+    save_model(model_data, subject, run)
 
     if visualize:
         plot_topoMap(clf, X_raw, y, epochs)
-
-def main():
-    parser = argparse.ArgumentParser(
-                    prog='Train',
-                    description='Train a model on EEG data',
-                    epilog='')
-    parser.add_argument('subject', type=int, help="Subject number (int)")
-    parser.add_argument('run', type=int, help="Run number (int)")
-    parser.add_argument('-v', '--visualize',
-                    action='store_true', help="print graph ?")
-    args = parser.parse_args()
-    Train(args.subject, args.run, args.visualize)
-
-if __name__ == "__main__":
-    main()
-    print("end")
