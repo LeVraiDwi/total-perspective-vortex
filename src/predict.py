@@ -7,14 +7,15 @@ import time
 
 def Predict(subject: int, run: int, model_path = "./model/", max_delay = 2.0, verbose = True, delay = 0.1):
     # 1. Charger le modèle sauvegardé
-    print(f"Chargement du modèle : {model_path}Export_{subject}_{run}.pkl")
+    path = f"{model_path}Export_{subject}_{run}.pkl"
+    print(f"Chargement du modèle : {path}")
     try:
-        data = joblib.load(model_path)
+        data = joblib.load(path)
         clf = data["clf"]
         random_state = data["random_state"]
         test_size = data["test_size"]
     except FileNotFoundError:
-        print(f"Model file not found: {model_path}")
+        print(f"Model file not found: {path}")
         return
     
     # 2. Charger et nettoyer les nouvelles données (Inférence)
@@ -63,3 +64,4 @@ def Predict(subject: int, run: int, model_path = "./model/", max_delay = 2.0, ve
         print(f"Average processing time: {avg_processing_time:.3f}s")
         print(f"Maximum processing time: {max_processing_time:.3f}s")
         print(f"Samples exceeding {max_delay}s limit: {sum(1 for t in processing_times if t > max_delay)}")
+    return accuracy

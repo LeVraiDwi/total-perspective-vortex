@@ -37,13 +37,23 @@ def main():
         print(f"Predicting with {args.model_path}...")
         Predict(args.subject, args.run)
     else:
-        for subject in range(1, 109):
-            for run in range(1, 14):
-                if not os.path.exists(f"./model/Export_{subject}_{run}.pkl"):
-                    Train(subject, run, visualize=False)
-                
+        experiment = [[3,7,11], [4,8,12], [5,9,13], [6,7,14]]
+        expAccuracy = []
+        for nbExp in range(len(experiment)):
+            exp = experiment[nbExp]
+            totalAccuracy = 0
+            for subject  in range(1, 109):
+                for run  in exp:
+                    if not os.path.exists(f"./model/Export_{subject}_{run}.pkl"):
+                        Train(subject, run, visualize=False)
+                    accuracy = Predict(subject, run)
+                    print(f"experiment {nbExp}: subject {subject:}: accuracy = {accuracy}")
+                    totalAccuracy += accuracy
+            expAccuracy.append(totalAccuracy / 108)
         
-
+        for nbexp in range(len(expAccuracy)):
+            exp = experiment[nbexp]
+            print(f"exp {nbexp}: accuracy = {exp}")
 
 if __name__ == "__main__":
     # Exemple : Prédire sur le sujet 4, run 12 avec le modèle entraîné précédemment

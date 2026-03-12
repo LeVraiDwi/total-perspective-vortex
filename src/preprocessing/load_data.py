@@ -16,12 +16,13 @@ def load_and_clean_data(subject: int, run: int, visualize: bool = False):
     raw.set_montage(montage)
     raw.set_eeg_reference(projection=True)
     
-    if 11 in HandTask:
+    if run in HandTask:
         raw.annotations.rename(dict(T1="left_fist", T2="right_fist"))  # as documented on PhysioNet
-    elif 11 in BothTask:
+    elif run in BothTask:
         raw.annotations.rename(dict(T1="both_fists", T2="both_feet"))  # as documented on PhysioNet
     else:
-        raise "trouble"
+        print("not a task run")
+        raise Exception("fail to load file")
     
     if visualize:
         print("Visualizing Raw Data...")

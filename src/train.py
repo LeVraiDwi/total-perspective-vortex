@@ -40,8 +40,10 @@ def score_model(clf, X, y):
 # --- 3. Train TREATMENT PIPELINE ---
 def Train(subject: int, run: int, random_state = 42, visualize: bool = False, test_size = 0.3):
     mne.set_log_level('WARNING')
-    raw = load_and_clean_data(subject, run, visualize)
-    
+    try:
+        raw = load_and_clean_data(subject, run, visualize)
+    except Exception:
+        return
     # Create Epochs (tmin/tmax adjusted for PhysioNet MI tasks)
     events, event_id = mne.events_from_annotations(raw)
     epochs = mne.Epochs(raw, events, event_id, tmin=0, tmax=4, 
