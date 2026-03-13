@@ -1,6 +1,7 @@
 from mne.io import concatenate_raws, read_raw_edf
 from mne.channels import make_standard_montage
 from mne.datasets.eegbci import load_data, standardize
+import mne
 
 HandTask = [3, 4, 7, 8, 11, 12]
 BothTask = [5, 6, 9, 10, 13, 14]
@@ -9,7 +10,8 @@ BothTask = [5, 6, 9, 10, 13, 14]
 def load_and_clean_data(subject: int, run: int, visualize: bool = False):
     # Load PhysioNet sample (Motor Imagery: Task 1 - Left vs Right Hand)
     # Note: Replace with actual local path to your PhysioNet .edf files
-    files = load_data(subject, run, path="data/", base_url="https://physionet.org/files/eegmmidb/1.0.0/")
+    mne.set_log_level('WARNING')
+    files = load_data(subject, run, path="/tmp/", base_url="https://physionet.org/files/eegmmidb/1.0.0/", verbose='WARNING')
     raw = concatenate_raws([read_raw_edf(f, preload=True) for f in files])
     standardize(raw)  # set channel names
     montage = make_standard_montage("standard_1005")

@@ -17,34 +17,42 @@ class CSP(BaseEstimator, TransformerMixin):
 
 
 def CSP_transform(X, fit_value):
-    # 1. Project all epochs at once: (Epochs, Filters, Time)
+    # Project all epochs at once: (Epochs, Filters, Time)
     # This tells NumPy to apply the filter matrix to the last two dims of every epoch
     Z = np.matmul(fit_value, X)
 
-    # 2. Calculate variance along the time axis (axis=-1)
+    # Calculate variance along the time axis (axis=-1)
     variances = np.var(Z, axis=-1)
 
-    # 3. Apply log
+    # Apply log
     features = np.log(variances)
     return features
 
 def CSP_fit(X, y):
     FitValue = {}
+    # iteraire sur chaque type d'event
     for label in np.unique(y):
         cl = X[y == label]
         not_cl = X[y != label]
         
-        # 2. Function/Logic to get mean covariance for target
+        # Function/Logic to get mean covariance for target
         cov_target = compute_mean_covariance(cl)
     
-        # 3. Function/Logic to get mean covariance for everything else
+        # Function/Logic to get mean covariance for everything else
         cov_others = compute_mean_covariance(not_cl)
 
+        # Singular Value Decomposition (SVD)
+        # determine le vecteur de direction des data et le vecteur de spread des data
         u, s, vh = np.linalg.svd(cov_target + cov_others)
+        # a l'aide des vecteur on creer une nouvelle matrice de transformation qui a pour variance 1 dans tout les direction
         p = np.diag(1.0 / (np.sqrt(s))) @ u.T
+
         S_target = p @ cov_target @ p.T
+
+        # on determine l' axe sur lequel sont repartit les data
         u_rot, s_rot, vh_rot = np.linalg.svd(S_target)
         
+        # avec le vecteur de direction des data on effectue une rotation sur la matrice. la mtrice etant spherique les donnees sont triee automatiquement de la plus puissante a la moins puissante.
         W = u_rot.T @ p
 
         FitValue[label] = np.vstack((W[:2], W[-2:]))

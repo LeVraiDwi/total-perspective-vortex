@@ -3,7 +3,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 from joblib import Parallel, delayed
 
-# db4 Decomposition Filter Coefficients
+# Daubechies 4 db4 Decomposition Filter Coefficients
+# Coefficient that are a stable for brain imagery
 h_low = [
     -0.01059740, 0.03288301, 0.03084138, -0.18703481, 
     -0.02798376, 0.63088076, 0.71484657, 0.23037781
@@ -21,10 +22,10 @@ g_high = h_high[::-1]
 
 def denoise_1d_signal(signal, level=3):
     """Décomposition et reconstruction manuelle pour un canal."""
-    # 1. Décomposition
+    # Décomposition
     coeffs = full_dwt(signal, levels=level)
     
-    # 2. Reconstruction (en ignorant le dernier niveau de détail D1)
+    # Reconstruction sans D1
     # Rappel : coeffs = [A3, D3, D2, D1]
     a3, d3, d2, d1 = coeffs
     
@@ -39,26 +40,25 @@ def parallel_denoise(X, n_jobs=-1):
     # X shape: (epochs, channels, times)
     n_epochs, n_channels, n_times = X.shape
     
-    # On "aplatit" pour traiter chaque canal comme une unité indépendante
+    # Take all signal from all epochs
     X_flat = X.reshape(-1, n_times)
     
-    # Exécution en parallèle
+    # Exécution en parallèle sur chaque signal
     results = Parallel(n_jobs=n_jobs)(
         delayed(denoise_1d_signal)(sig) for sig in X_flat
     )
     
-    # On redonne la forme originale
+    # reconstruct with the orignal shape
     return np.array(results).reshape(n_epochs, n_channels, -1)
 
 def dwt_step(signal, h_low, h_high):
     """Applies one level of DWT to a 1D signal."""
-    # 1. Filter the signal
-    # 'valid' or 'same' padding keeps the sizes manageable
+    # Filter the signal
+    # filterAprox = sum(signal[k].h(n-k)) avev signal[k] le kiem element du signal h the filter
     approx = np.convolve(signal, h_low, mode='same')
     detail = np.convolve(signal, h_high, mode='same')
     
-    # 2. Downsample (Keep every second point)
-    # This is the 'D' in DWT (Discrete)
+    # Downsample devide the size of the batch by 2 keeping one value on 2
     approx = approx[::2]
     detail = detail[::2]
     
@@ -69,6 +69,7 @@ def full_dwt(signal, levels=3):
     all_details = []
     
     for i in range(levels):
+        # get the detail and the slow frequency of the signal
         approx, detail = dwt_step(current_input, h_low, h_high)
         all_details.append(detail)
         current_input = approx # The new input for the next level
@@ -97,27 +98,23 @@ class WaveletDenoiseTransformer(BaseEstimator, TransformerMixin):
 def idwt_step(approx, detail):
     """Reconstruit un niveau de signal à partir de l'approximation et du détail."""
     
-    # 1. Upsampling : insérer des zéros
+    # Upsampling double la taille de la list en ajoutant des 0 entre les valeurs
     def upsample(x):
         res = np.zeros(len(x) * 2)
-        res[::2] = x
+        res[::2] = x # place x every odd index
         return res
 
     a_up = upsample(approx)
-    # Si on veut débruiter (votre but), on peut passer un 'detail' nul
     d_up = upsample(detail) if detail is not None else np.zeros(len(approx) * 2)
 
-    # 2. Filtrage (Convolution)
-    # On utilise 'same' pour garder la dimension cohérente
+    # Filtrage (Convolution)
     low_part = np.convolve(a_up, g_low, mode='same')
     high_part = np.convolve(d_up, g_high, mode='same')
     
-    # On détermine la longueur cible (celle du signal original à ce niveau)
-    # Pour faire simple, on s'aligne sur la longueur de low_part
+    # On détermine la taille du signal original 
     n = min(len(low_part),len(high_part))
     high_part = high_part[:n]
     low_part = low_part[:n]
-    # 3. Somme
     return low_part + high_part
 
 def full_idwt(coeffs):

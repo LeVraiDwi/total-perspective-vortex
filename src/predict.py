@@ -1,14 +1,14 @@
 import mne
 import joblib
 import numpy as np
-from preprocessing.load_data import load_and_clean_data
+from load_data import load_and_clean_data
 from sklearn.model_selection import train_test_split
 import time
 
 def Predict(subject: int, run: int, model_path = "./model/", max_delay = 2.0, verbose = True, delay = 0.1):
     # 1. Charger le modèle sauvegardé
     path = f"{model_path}Export_{subject}_{run}.pkl"
-    print(f"Chargement du modèle : {path}")
+    #print(f"Chargement du modèle : {path}")
     try:
         data = joblib.load(path)
         clf = data["clf"]
