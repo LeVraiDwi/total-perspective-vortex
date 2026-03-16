@@ -8,6 +8,12 @@ class CSP(BaseEstimator, TransformerMixin):
     def fit(self, X, y):
         fitValue = CSP_fit(X, y)
         self.fit_value = np.vstack(list(fitValue.values()))
+
+        # 2. Combine filters from all classes
+        self.filters_ = np.vstack(list(fitValue.values()))
+        # Patterns = pinv(Filters).T
+        self.patterns_ = np.linalg.pinv(self.filters_).T
+
         return self
     
     def transform(self, X):

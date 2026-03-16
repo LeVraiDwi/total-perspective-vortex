@@ -6,7 +6,6 @@ import mne
 HandTask = [3, 4, 7, 8, 11, 12]
 BothTask = [5, 6, 9, 10, 13, 14]
 
-# --- 1. PREPROCESSING & VISUALIZATION ---
 def load_and_clean_data(subject: int, run: int, visualize: bool = False):
     # Load PhysioNet sample (Motor Imagery: Task 1 - Left vs Right Hand)
     # Note: Replace with actual local path to your PhysioNet .edf files

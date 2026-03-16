@@ -5,10 +5,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.model_selection import ShuffleSplit , cross_val_score
 import joblib
-from visualize import plot_scalogram, plot_topoMap
+from visualize import plot_scalogram
 from WaveletDenoiseTransformer import WaveletDenoiseTransformer
 from load_data import load_and_clean_data
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 tmin, tmax = 0.0, 4.0
 subjects = 4
@@ -20,7 +21,7 @@ def save_model(model_data, subject, run):
     #print(f"Model saved as Export_{subject}_{run}.pkl")
     return
 
-def cross_val(clf, X, y, random_state):
+def cross_val_sc(clf, X, y, random_state):
     cv = ShuffleSplit(10, test_size=0.2, random_state=random_state)
 
     scores = cross_val_score(clf, X, y, cv=cv, n_jobs=None, verbose=0)
@@ -67,18 +68,9 @@ def Train(subject: int, run: int, random_state = 42, visualize: bool = False, te
     ], verbose=False)
 
     clf.fit(X_train_val, y_train_val)
-
+   
     if cross_val:
-        scores = cross_val(clf, X_train_val, y_train_val, random_state=random_state)
-    
-    # On divise le reste (80%) pour avoir 20% de VAL et 60% de TRAIN
-    # 0.25 * 0.80 = 0.20
-    #X_validation_val, X_test_val, y_validation_val, y_test_val = train_test_split(
-    #    X_validation, y_validation, test_size=0.5, random_state=None, stratify=y_validation
-    #)
-    
-    # Score sur le Validation Set
-    #val_score = score_model(clf, X_validation_val, y_validation_val)
+        scores = cross_val_sc(clf, X_train_val, y_train_val, random_state=random_state)
 
     model_data = {
         "clf": clf,
@@ -87,6 +79,4 @@ def Train(subject: int, run: int, random_state = 42, visualize: bool = False, te
     }
     
     save_model(model_data, subject, run)
-
-    if visualize:
-        plot_topoMap(clf, X_raw, y, epochs)
+    return

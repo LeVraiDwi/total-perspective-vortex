@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 import time
 
 def Predict(subject: int, run: int, model_path = "./model/", max_delay = 2.0, verbose = True, delay = 0.1):
-    # 1. Charger le modèle sauvegardé
+    # Charger le modèle sauvegardé
     path = f"{model_path}Export_{subject}_{run}.pkl"
     #print(f"Chargement du modèle : {path}")
     try:
@@ -18,11 +18,11 @@ def Predict(subject: int, run: int, model_path = "./model/", max_delay = 2.0, ve
         print(f"Model file not found: {path}")
         return
     
-    # 2. Charger et nettoyer les nouvelles données (Inférence)
+    # Charger et nettoyer les nouvelles données (Inférence)
     # On utilise la même fonction de nettoyage pour garder la cohérence (8-30Hz)
     raw = load_and_clean_data(subject, run, visualize=False)
     
-    # 3. Créer les Epochs
+    # Créer les Epochs
     events, event_id = mne.events_from_annotations(raw)
     epochs = mne.Epochs(raw, events, event_id, tmin=0.0, tmax=4.0, 
                         baseline=None, preload=True)
